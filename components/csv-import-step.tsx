@@ -18,6 +18,7 @@ type Phase = "idle" | "dragover" | "loaded" | "generating" | "done";
 type CsvImportStepProps = {
   onNext: () => void;
   onComplete?: (segments: Segment[]) => void;
+  onProjectId?: (projectId: string) => void;
 };
 
 function mapSegment(segment: Segment): Step1Row {
@@ -49,7 +50,7 @@ function asValidationErrors(value: unknown): ValidationError[] {
   });
 }
 
-export default function CsvImportStep({ onNext, onComplete }: CsvImportStepProps) {
+export default function CsvImportStep({ onNext, onComplete, onProjectId }: CsvImportStepProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [genCount, setGenCount] = useState(0);
@@ -82,6 +83,7 @@ export default function CsvImportStep({ onNext, onComplete }: CsvImportStepProps
         activeProjectId = project.projectId;
         setProjectId(activeProjectId);
       }
+      onProjectId?.(activeProjectId);
 
       const formData = new FormData();
       formData.append("file", selectedFile);

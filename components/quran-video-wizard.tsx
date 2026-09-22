@@ -33,6 +33,7 @@ export default function QuranVideoWizard() {
   const [step, setStep] = useState<StepId>(1);
   const [dark, setDark] = useState(false);
   const [segments, setSegments] = useState<SyncSegment[]>([]);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const toggleDark = () =>
     setDark((value) => {
       const next = !value;
@@ -51,12 +52,14 @@ export default function QuranVideoWizard() {
       <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6 sm:py-12">
         {step === 1 && (
           <CsvImportStep
+            onProjectId={setProjectId}
             onComplete={(value) => setSegments(toSyncSegments(value))}
             onNext={() => setStep(2)}
           />
         )}
         {step === 2 && (
           <VideoUploadStep
+            projectId={projectId}
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
