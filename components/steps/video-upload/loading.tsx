@@ -1,0 +1,3 @@
+export function VideoUploadLoading() {
+  return <div className="animate-[fadeIn_0.2s_ease] space-y-6"><div className="space-y-1"><div className="h-6 w-48 animate-pulse rounded bg-slate-100 dark:bg-slate-800" /><div className="h-4 w-72 animate-pulse rounded bg-slate-100 dark:bg-slate-800" /></div><div className="flex flex-col gap-6 sm:flex-row"><div className="aspect-video animate-pulse rounded-xl bg-slate-100 sm:w-[55%] dark:bg-slate-800" /><div className="grid content-start grid-cols-2 gap-3 sm:w-[45%]">{Array.from({ length: 6 }, (_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />)}</div></div></div>;
+}

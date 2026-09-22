@@ -1,7 +1,6 @@
 
 import "./globals.css";
 import type { ReactNode } from "react";
-import { Toaster } from "@/components/ui/sonner";
 
 export const metadata = {
   title: "FYTOBYTE",
@@ -14,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="font-sans">
-      <body>{children}<Toaster /></body>
+      <body>{children}</body>
     </html>
   );
 }

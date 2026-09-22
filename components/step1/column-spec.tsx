@@ -1,0 +1,5 @@
+const columns = [{ name: "ayah", desc: "e.g. 1:1" }, { name: "segment", desc: "integer" }, { name: "arabic", desc: "RTL text" }, { name: "translation", desc: "LTR text" }, { name: "start_time", desc: "seconds" }, { name: "end_time", desc: "seconds" }];
+
+export function ColumnSpec() {
+  return <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Expected CSV columns</p><div className="flex flex-wrap gap-2">{columns.map((column) => <div key={column.name} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800"><code className="text-xs font-mono font-medium text-teal-700 dark:text-teal-400">{column.name}</code><span className="text-xs text-slate-400 dark:text-slate-500">· {column.desc}</span></div>)}</div><p className="text-xs text-slate-400 dark:text-slate-500">First row must be a header row matching these column names exactly.</p></div>;
+}

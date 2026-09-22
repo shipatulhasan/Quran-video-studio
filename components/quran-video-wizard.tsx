@@ -1,0 +1,76 @@
+"use client";
+
+import { useState } from "react";
+import type { Segment } from "@prisma/client";
+import CsvImportStep from "@/components/csv-import-step";
+import PreviewSyncStep from "@/components/steps/preview-sync-step";
+import type { SyncSegment } from "@/components/steps/preview-sync/types";
+import RenderStep from "@/components/steps/render-step";
+import VideoUploadStep from "@/components/steps/video-upload-step";
+import { WizardFooter } from "@/components/wizard-footer";
+import { WizardHeader } from "@/components/wizard-header";
+
+type StepId = 1 | 2 | 3 | 4;
+const STEPS = [
+  { id: 1, label: "Upload CSV", shortLabel: "CSV" },
+  { id: 2, label: "Add Video", shortLabel: "Video" },
+  { id: 3, label: "Preview & Sync", shortLabel: "Sync" },
+  { id: 4, label: "Render & Export", shortLabel: "Export" },
+];
+
+function toSyncSegments(segments: Segment[]): SyncSegment[] {
+  return segments.map((segment) => ({
+    id: segment.id,
+    ayah: segment.ayah,
+    arabic: segment.arabic,
+    translation: segment.translation,
+    start: segment.startTime,
+    end: segment.endTime,
+  }));
+}
+
+export default function QuranVideoWizard() {
+  const [step, setStep] = useState<StepId>(1);
+  const [dark, setDark] = useState(false);
+  const [segments, setSegments] = useState<SyncSegment[]>([]);
+  const toggleDark = () =>
+    setDark((value) => {
+      const next = !value;
+      document.documentElement.classList.toggle("dark", next);
+      return next;
+    });
+  return (
+    <div className="min-h-screen bg-slate-50 transition-colors duration-200 dark:bg-[#0a0f1a]">
+      <WizardHeader
+        steps={STEPS}
+        currentStep={step}
+        dark={dark}
+        onToggleDark={toggleDark}
+        onStepSelect={(value) => setStep(value as StepId)}
+      />
+      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6 sm:py-12">
+        {step === 1 && (
+          <CsvImportStep
+            onComplete={(value) => setSegments(toSyncSegments(value))}
+            onNext={() => setStep(2)}
+          />
+        )}
+        {step === 2 && (
+          <VideoUploadStep
+            onBack={() => setStep(1)}
+            onNext={() => setStep(3)}
+          />
+        )}
+        {step === 3 && (
+          <PreviewSyncStep
+            initialSegments={segments}
+            onBack={() => setStep(2)}
+            onNext={() => setStep(4)}
+          />
+        )}
+        {step === 4 && <RenderStep onBack={() => setStep(3)} />}
+      </main>
+      <WizardFooter />
+    </div>
+  );
+}
