@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  CSV_READY
+  OVERLAYS_READY
+  VIDEO_READY
+  RENDERING
+  COMPLETE
+}
+
+enum RenderStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  name          String
+  baseVideoPath String?
+  duration      Float?
+  resolution    String?
+  frameRate     Float?
+  status        ProjectStatus  @default(DRAFT)
+  segments      Segment[]
+  renderJobs    RenderJob[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Segment {
+  id               String  @id @default(cuid())
+  projectId        String
+  ayah             String
+  segmentIndex     Int
+  arabic           String
+  translation      String
+  startTime        Float
+  endTime          Float
+  overlayAssetPath String?
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, segmentIndex])
+}
+
+model RenderJob {
+  id         String       @id @default(cuid())
+  projectId  String
+  status     RenderStatus @default(PENDING)
+  progress   Float        @default(0)
+  outputPath String?
+  error      String?
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
