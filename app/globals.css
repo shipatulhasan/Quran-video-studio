@@ -1,0 +1,3 @@
+@import "tailwindcss";
+:root { --bg:#08111f; --panel:#101d31; --muted:#91a4bd; --text:#edf5ff; --accent:#73e0c1; }
+* { box-sizing:border-box; } body { margin:0; background:radial-gradient(circle at 10% 0%,#143353 0,#08111f 42%); color:var(--text); font-family:Arial,sans-serif; } button,input { font:inherit; } .panel { background:rgba(16,29,49,.78); border:1px solid #29415f; border-radius:18px; } .btn { border:0; border-radius:10px; padding:10px 16px; background:var(--accent); color:#07131d; font-weight:700; cursor:pointer; } .btn:disabled { opacity:.5; cursor:not-allowed; } .input { width:100%; background:#0a1627; border:1px solid #304765; border-radius:8px; padding:10px; color:var(--text); } .muted { color:var(--muted); }

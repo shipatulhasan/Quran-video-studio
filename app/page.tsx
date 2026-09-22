@@ -1,0 +1,1 @@
+export default function Home(){return <main className="mx-auto max-w-3xl p-8"><p className="muted text-sm tracking-[.3em]">FYTOBYTE</p><h1 className="mt-4 text-5xl font-bold">Automated Quran Video Production Tool</h1><p className="muted mt-4 text-lg">Phase 0 scaffold is ready.</p></main>}
