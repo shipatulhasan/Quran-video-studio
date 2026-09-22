@@ -121,7 +121,7 @@ export default function CsvImportStep({ onNext, onComplete }: CsvImportStepProps
     if (selectedFile) void uploadFile(selectedFile);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setPhase("generating");
     setProgress(0);
     setGenCount(0);
@@ -132,9 +132,26 @@ export default function CsvImportStep({ onNext, onComplete }: CsvImportStepProps
       setProgress(Math.round((count / rows.length) * 100));
       if (count >= rows.length) {
         if (timerRef.current) clearInterval(timerRef.current);
-        setTimeout(() => setPhase("done"), 500);
       }
     }, 320);
+
+    try {
+      if (!projectId) throw new Error("This CSV is not attached to a project");
+      const response = await fetch(`/api/projects/${projectId}/generate-overlays`, { method: "POST" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Overlay generation failed");
+      if (timerRef.current) clearInterval(timerRef.current);
+      setGenCount(rows.length);
+      setProgress(100);
+      setTimeout(() => {
+        setPhase("done");
+        onNext();
+      }, 500);
+    } catch (error) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setErrors([{ row: 0, field: "overlays", message: error instanceof Error ? error.message : "Overlay generation failed" }]);
+      setPhase("idle");
+    }
   };
 
   if (loading) {
