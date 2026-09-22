@@ -1,9 +1,7 @@
-import "./globals.css";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-import { Toaster } from "@/components/ui/sonner";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+import "./globals.css";
+import type { ReactNode } from "react";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata = {
   title: "FYTOBYTE",
@@ -12,10 +10,10 @@ export const metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en" className="font-sans">
       <body>{children}<Toaster /></body>
     </html>
   );

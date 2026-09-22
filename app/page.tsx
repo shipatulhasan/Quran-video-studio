@@ -1,2 +1,34 @@
-import Link from "next/link";
-export default function Home(){return <main className="mx-auto max-w-3xl p-8"><p className="text-sm tracking-[.3em] text-muted-foreground">FYTOBYTE</p><h1 className="mt-4 text-5xl font-bold">Automated Quran Video Production Tool</h1><p className="mt-4 text-lg text-muted-foreground">Import timed ayahs from a CSV and prepare them for the video pipeline.</p><Link className="mt-8 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground" href="/projects/new">Create project</Link></main>}
+"use client";
+
+import { useEffect, useState } from "react";
+import { CsvImportStep } from "@/components/csv-import-step";
+import { WizardFooter } from "@/components/wizard-footer";
+import { WizardHeader } from "@/components/wizard-header";
+
+const steps = [
+  { id: 1, label: "Upload CSV", shortLabel: "CSV" },
+  { id: 2, label: "Add Video", shortLabel: "Video" },
+  { id: 3, label: "Preview & Sync", shortLabel: "Sync" },
+  { id: 4, label: "Render & Export", shortLabel: "Export" },
+];
+
+export default function Home() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+  return (
+    <div className="flex min-h-screen flex-col bg-background text-foreground transition-colors">
+      <WizardHeader
+        steps={steps}
+        currentStep={1}
+        dark={dark}
+        onToggleDark={() => setDark((value) => !value)}
+      />
+      <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-8 sm:px-6 sm:py-12">
+        <CsvImportStep onComplete={() => undefined} />
+      </main>
+      <WizardFooter />
+    </div>
+  );
+}
