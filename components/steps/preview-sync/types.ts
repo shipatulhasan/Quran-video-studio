@@ -1,4 +1,20 @@
-export type SyncSegment = { id: string | number; ayah: string; arabic: string; translation: string; start: number; end: number };
+export type SyncSegment = { id: string | number; ayah: string; arabic: string; translation: string; start: number; end: number; overlayAssetPath?: string | null };
+
+export function findActiveSegmentIndex(segments: SyncSegment[], time: number) {
+  let low = 0;
+  let high = segments.length - 1;
+  let candidate = -1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (segments[middle].start <= time) {
+      candidate = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return candidate >= 0 && time <= segments[candidate].end ? candidate : -1;
+}
 
 export const SAMPLE_SYNC_SEGMENTS: SyncSegment[] = [
   { id: 1, ayah: "1:1", arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", translation: "In the name of Allah, the Entirely Merciful, the Especially Merciful.", start: 0, end: 4.2 },

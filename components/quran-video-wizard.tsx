@@ -26,6 +26,7 @@ function toSyncSegments(segments: Segment[]): SyncSegment[] {
     translation: segment.translation,
     start: segment.startTime,
     end: segment.endTime,
+    overlayAssetPath: segment.overlayAssetPath,
   }));
 }
 
@@ -66,6 +67,7 @@ export default function QuranVideoWizard() {
         )}
         {step === 3 && (
           <PreviewSyncStep
+            projectId={projectId}
             initialSegments={segments}
             onBack={() => setStep(2)}
             onNext={() => setStep(4)}
