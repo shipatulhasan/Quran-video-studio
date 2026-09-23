@@ -42,7 +42,7 @@ export default function QuranVideoWizard() {
       return next;
     });
   return (
-    <div className="min-h-screen bg-slate-50 transition-colors duration-200 dark:bg-[#0a0f1a]">
+    <div className="flex min-h-screen flex-col bg-slate-50 transition-colors duration-200 dark:bg-[#0a0f1a]">
       <WizardHeader
         steps={STEPS}
         currentStep={step}
@@ -50,7 +50,7 @@ export default function QuranVideoWizard() {
         onToggleDark={toggleDark}
         onStepSelect={(value) => setStep(value as StepId)}
       />
-      <main className="mx-auto max-w-[1260px] px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-4 py-8 sm:px-6 sm:py-12">
         {step === 1 && (
           <CsvImportStep
             onProjectId={setProjectId}

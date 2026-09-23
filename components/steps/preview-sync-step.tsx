@@ -65,10 +65,9 @@ export default function PreviewSyncStep({
   const [loadError, setLoadError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const total =
-    mediaDuration && Number.isFinite(mediaDuration)
-      ? mediaDuration
-      : Math.max(30, ...segments.map((segment) => segment.end));
+  const total = mediaDuration && Number.isFinite(mediaDuration)
+    ? mediaDuration
+    : Math.max(30, ...segments.map((segment) => segment.end));
   const activeIndex = findActiveSegmentIndex(segments, time);
   const activeSegment = segments[activeIndex];
 
@@ -84,12 +83,14 @@ export default function PreviewSyncStep({
       .then(async (response) => {
         const data = (await response.json()) as {
           segments?: ApiSegment[];
+          duration?: number | null;
           error?: string;
         };
         if (!response.ok)
           throw new Error(data.error ?? "Could not load project segments");
         if (!cancelled && data.segments?.length) {
           const nextSegments = data.segments.map(mapApiSegment);
+          setMediaDuration(data.duration ?? null);
           setSegments(nextSegments);
           setSavedTimes(
             Object.fromEntries(
@@ -97,8 +98,8 @@ export default function PreviewSyncStep({
                 String(segment.id),
                 { start: segment.start, end: segment.end },
               ]),
-            ),
-          );
+              ),
+            );
         }
       })
       .catch((error: unknown) => {
@@ -233,8 +234,8 @@ export default function PreviewSyncStep({
           {saveError}
         </div>
       )}
-      <div className="flex flex-col gap-5 lg:flex-row">
-        <div className="space-y-3 lg:w-[63%]">
+      <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,63fr)_minmax(0,37fr)]">
+        <div className="min-w-0 space-y-3">
           <PreviewPlayer
             activeSegment={activeSegment}
             playing={playing}
@@ -262,44 +263,20 @@ export default function PreviewSyncStep({
             onSeek={seekTo}
           />
         </div>
-        <SyncSegmentList
-          segments={segments}
-          activeIndex={activeIndex}
-          listRef={listRef}
-          onSeek={seekTo}
-          onTimeChange={handleTimeChange}
-          onRangeChange={handleRangeChange}
-          maxDuration={total}
-        />
-      </div>
-      <div className="mt-4 space-y-2.5 border-t border-slate-200 pt-4 dark:border-slate-700 lg:ml-[63%]">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all ${saved ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-teal-600 text-white shadow-sm hover:bg-teal-700 disabled:cursor-wait disabled:opacity-70 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"}`}
-        >
-          {saving
-            ? "Saving Changes…"
-            : saved
-              ? "✓  Changes saved"
-              : "▣  Save Changes"}
-        </button>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            ← &nbsp;Back
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            className="flex-1 rounded-lg border border-teal-200 py-2 text-xs font-medium text-teal-600 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-400 dark:hover:bg-teal-950"
-          >
-            Proceed to Render&nbsp; →
-          </button>
+        <div className="flex max-h-[645px] min-w-0 flex-col">
+          <SyncSegmentList
+            segments={segments}
+            activeIndex={activeIndex}
+            listRef={listRef}
+            onSeek={seekTo}
+            onTimeChange={handleTimeChange}
+            onRangeChange={handleRangeChange}
+            maxDuration={total}
+          />
+          <div className="mt-4 space-y-2.5 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <button type="button" onClick={() => void handleSave()} disabled={saving} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all ${saved ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-teal-600 text-white shadow-sm hover:bg-teal-700 disabled:cursor-wait disabled:opacity-70 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"}`}>{saving ? "Saving Changes…" : saved ? "✓  Changes saved" : "▣  Save Changes"}</button>
+            <div className="flex gap-2"><button type="button" onClick={onBack} className="flex-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">← &nbsp;Back</button><button type="button" onClick={onNext} className="flex-1 rounded-lg border border-teal-200 py-2 text-xs font-medium text-teal-600 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-400 dark:hover:bg-teal-950">Proceed to Render&nbsp; →</button></div>
+          </div>
         </div>
       </div>
     </div>
