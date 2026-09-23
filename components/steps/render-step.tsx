@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DoneRenderState, ErrorRenderState, IdleRenderState, QueuedRenderState, RenderingState } from "@/components/steps/render/render-states";
 
 type Phase = "idle" | "queued" | "rendering" | "done" | "error";
-type RenderJobResponse = { id: string; status: "PENDING" | "PROCESSING" | "DONE" | "FAILED"; progress: number; outputPath: string | null; error: string | null };
+type RenderJobResponse = { id: string; status: "PENDING" | "PROCESSING" | "DONE" | "FAILED"; progress: number; stage: string | null; outputPath: string | null; error: string | null };
 
 export default function RenderStep({ onBack, projectId, segmentCount = 7 }: { onBack: () => void; projectId: string | null; segmentCount?: number }) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -36,7 +36,7 @@ export default function RenderStep({ onBack, projectId, segmentCount = 7 }: { on
         const job = data.job;
         setProgress(job.progress);
         if (job.status === "PENDING") setPhase("queued");
-        if (job.status === "PROCESSING") { setPhase("rendering"); const remaining = Math.round((100 - job.progress) / 100 * 38); setEta(remaining > 0 ? `~${remaining}s remaining` : "Finalizing…"); }
+        if (job.status === "PROCESSING") { setPhase("rendering"); const remaining = Math.round((100 - job.progress) / 100 * 38); setEta(job.stage ? `${job.stage}${remaining > 0 ? ` · ~${remaining}s remaining` : " · Finalizing…"}` : (remaining > 0 ? `~${remaining}s remaining` : "Finalizing…")); }
         if (job.status === "DONE") { setProgress(100); setDownloadUrl(job.outputPath); setPhase("done"); }
         if (job.status === "FAILED") { setErrorMessage(job.error ?? "FFmpeg process failed while rendering the final video."); setPhase("error"); }
       } catch (error) { setErrorMessage(error instanceof Error ? error.message : "Could not read render status"); setPhase("error"); }

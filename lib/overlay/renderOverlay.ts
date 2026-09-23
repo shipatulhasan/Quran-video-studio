@@ -1,10 +1,8 @@
 import sharp from "sharp";
 import type { Segment } from "@prisma/client";
 
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const CARD_WIDTH = 1500;
-const CARD_X = (WIDTH - CARD_WIDTH) / 2;
+const DEFAULT_WIDTH = 1920;
+const DEFAULT_HEIGHT = 1080;
 
 function escapeXml(value: string) {
   return value.replace(/[<>&'\"]/g, (character) => ({
@@ -37,18 +35,29 @@ function textLines(lines: string[], x: number, firstBaseline: number, lineHeight
   return lines.map((line, index) => `<text x="${x}" y="${firstBaseline + index * lineHeight}" ${attributes}>${escapeXml(line)}</text>`).join("");
 }
 
-export async function renderOverlay(segment: Pick<Segment, "arabic" | "translation" | "ayah">, outputPath: string) {
+export async function renderOverlay(
+  segment: Pick<Segment, "arabic" | "translation" | "ayah">,
+  outputPath: string,
+  dimensions: { width: number; height: number } = { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
+) {
+  const width = Math.max(1, dimensions.width);
+  const height = Math.max(1, dimensions.height);
+  const scale = width / DEFAULT_WIDTH;
+  const cardWidth = width * 0.88;
+  const cardX = (width - cardWidth) / 2;
+  // Font and card scale together. Keeping these limits stable preserves the
+  // same line width at every output resolution.
   const arabicLines = wrapText(segment.arabic, 28);
   const translationLines = wrapText(segment.translation, 64);
-  const cardHeight = 150 + arabicLines.length * 76 + translationLines.length * 38;
-  const cardY = HEIGHT - cardHeight - 86;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
-    <defs><clipPath id="cardClip"><rect x="${CARD_X}" y="${cardY}" width="${CARD_WIDTH}" height="${cardHeight}" rx="28"/></clipPath></defs>
-    <rect x="${CARD_X}" y="${cardY}" width="${CARD_WIDTH}" height="${cardHeight}" rx="28" fill="#000000" fill-opacity="0.78" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>
+  const cardHeight = 150 * scale + arabicLines.length * 76 * scale + translationLines.length * 38 * scale;
+  const cardY = height - cardHeight - 86 * scale;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <defs><clipPath id="cardClip"><rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="${28 * scale}"/></clipPath></defs>
+    <rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="${28 * scale}" fill="#000000" fill-opacity="0.78" stroke="#ffffff" stroke-opacity="0.12" stroke-width="${2 * scale}"/>
     <g clip-path="url(#cardClip)">
-      ${textLines(arabicLines, WIDTH / 2, cardY + 92, 76, 'fill="#ffffff" font-family="Arial, Noto Naskh Arabic, sans-serif" font-size="58" text-anchor="middle" direction="rtl"')}
-      ${textLines(translationLines, WIDTH / 2, cardY + 112 + arabicLines.length * 76, 38, 'fill="#ffffff" fill-opacity="0.82" font-family="Arial, sans-serif" font-size="28" text-anchor="middle"')}
-      <text x="${CARD_X + 48}" y="${cardY + cardHeight - 34}" fill="#ffffff" fill-opacity="0.45" font-family="monospace" font-size="22">${escapeXml(segment.ayah)}</text>
+      ${textLines(arabicLines, width / 2, cardY + 92 * scale, 76 * scale, `fill="#ffffff" font-family="Arial, Noto Naskh Arabic, sans-serif" font-size="${58 * scale}" text-anchor="middle" direction="rtl"`)}
+      ${textLines(translationLines, width / 2, cardY + (112 + arabicLines.length * 76) * scale, 38 * scale, `fill="#ffffff" fill-opacity="0.82" font-family="Arial, sans-serif" font-size="${28 * scale}" text-anchor="middle"`)}
+      <text x="${cardX + 48 * scale}" y="${cardY + cardHeight - 34 * scale}" fill="#ffffff" fill-opacity="0.45" font-family="monospace" font-size="${22 * scale}">${escapeXml(segment.ayah)}</text>
     </g>
   </svg>`;
 

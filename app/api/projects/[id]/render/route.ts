@@ -9,23 +9,46 @@ export const runtime = "nodejs";
 
 function storageRoot() { return process.env.STORAGE_DIR ? path.resolve(process.env.STORAGE_DIR) : path.join(process.cwd(), "public", "uploads"); }
 
-async function runRender(projectId: string, jobId: string, segments: Array<{ segmentIndex: number; startTime: number; endTime: number; ayah: string; arabic: string; translation: string }>) {
+function videoDimensions(resolution: string | null) {
+  const match = resolution?.match(/(\d+)\s*[×x]\s*(\d+)/i);
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : { width: 1920, height: 1080 };
+}
+
+async function runRender(projectId: string, jobId: string, resolution: string | null, segments: Array<{ segmentIndex: number; startTime: number; endTime: number; ayah: string; arabic: string; translation: string }>) {
   const root = storageRoot();
   const projectDirectory = path.join(root, projectId);
   const outputPath = path.join(projectDirectory, "final.mp4");
+  let encodingProgress = 10;
+  let encodingTarget = 10;
+  let progressTimer: ReturnType<typeof setInterval> | undefined;
   try {
-    await db.renderJob.update({ where: { id: jobId }, data: { status: "PROCESSING", progress: 0 } });
+    await db.renderJob.update({ where: { id: jobId }, data: { status: "PROCESSING", progress: 0, stage: "Preparing render" } });
     const overlayDirectory = path.join(projectDirectory, "overlays");
     await mkdir(overlayDirectory, { recursive: true });
-    for (const segment of segments) {
+    for (const [index, segment] of segments.entries()) {
       const filename = `${String(segment.segmentIndex + 1).padStart(4, "0")}.png`;
-      await renderOverlay(segment, path.join(overlayDirectory, filename));
+      await renderOverlay(segment, path.join(overlayDirectory, filename), videoDimensions(resolution));
+      await db.renderJob.update({ where: { id: jobId }, data: { progress: Math.round(((index + 1) / segments.length) * 10), stage: `Preparing overlay ${index + 1} of ${segments.length}` } });
     }
-    await renderFinal({ sourcePath: path.join(projectDirectory, "source.mp4"), outputPath, overlayRoot: path.join(projectDirectory, "overlays"), segments, onProgress: (progress) => { void db.renderJob.update({ where: { id: jobId }, data: { progress } }).catch(() => undefined); } });
-    await db.renderJob.update({ where: { id: jobId }, data: { status: "DONE", progress: 100, outputPath: `/uploads/${projectId}/final.mp4` } });
+    await db.renderJob.update({ where: { id: jobId }, data: { progress: 10, stage: "Encoding video" } });
+    progressTimer = setInterval(() => {
+      // Complex FFmpeg filters can emit very few progress events. Advance
+      // gradually toward the latest target so the UI never jumps from 10% to
+      // 100% while encoding is still running.
+      encodingProgress = Math.min(95, Math.max(encodingProgress + 1, Math.min(encodingTarget, encodingProgress + 3)));
+      void db.renderJob.update({ where: { id: jobId }, data: { progress: encodingProgress, stage: "Encoding video" } }).catch(() => undefined);
+    }, 1000);
+    await renderFinal({ sourcePath: path.join(projectDirectory, "source.mp4"), outputPath, overlayRoot: path.join(projectDirectory, "overlays"), segments, onProgress: (progress) => {
+      encodingTarget = Math.min(95, 10 + progress * 0.9);
+    } });
+    if (progressTimer) clearInterval(progressTimer);
+    await db.renderJob.update({ where: { id: jobId }, data: { progress: 97, stage: "Finalizing video" } });
+    await db.renderJob.update({ where: { id: jobId }, data: { status: "DONE", progress: 100, stage: "Complete", outputPath: `/uploads/${projectId}/final.mp4` } });
   } catch (error) {
     console.error("Final video render failed", error);
-    await db.renderJob.update({ where: { id: jobId }, data: { status: "FAILED", error: error instanceof Error ? error.message : "Render failed" } }).catch(() => undefined);
+    await db.renderJob.update({ where: { id: jobId }, data: { status: "FAILED", stage: "Failed", error: error instanceof Error ? error.message : "Render failed" } }).catch(() => undefined);
+  } finally {
+    if (progressTimer) clearInterval(progressTimer);
   }
 }
 
@@ -37,9 +60,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!project.segments.length) return NextResponse.json({ error: "No segments are available for rendering" }, { status: 422 });
   if (project.segments.some((segment) => !segment.overlayAssetPath)) return NextResponse.json({ error: "Generate overlay assets before rendering" }, { status: 422 });
 
-  const job = await db.renderJob.create({ data: { projectId: id, status: "PENDING", progress: 0 } });
+  const job = await db.renderJob.create({ data: { projectId: id, status: "PENDING", progress: 0, stage: "Queued" } });
   await db.project.update({ where: { id }, data: { status: "RENDERING" } });
   await mkdir(path.join(storageRoot(), id), { recursive: true });
-  void runRender(id, job.id, project.segments);
+  void runRender(id, job.id, project.resolution, project.segments);
   return NextResponse.json({ job }, { status: 202 });
 }
