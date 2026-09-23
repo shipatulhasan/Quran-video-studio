@@ -50,7 +50,7 @@ export default function QuranVideoWizard() {
         onToggleDark={toggleDark}
         onStepSelect={(value) => setStep(value as StepId)}
       />
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto max-w-[1260px] px-4 py-8 sm:px-6 sm:py-12">
         {step === 1 && (
           <CsvImportStep
             onProjectId={setProjectId}
@@ -73,7 +73,7 @@ export default function QuranVideoWizard() {
             onNext={() => setStep(4)}
           />
         )}
-        {step === 4 && <RenderStep onBack={() => setStep(3)} />}
+        {step === 4 && <RenderStep projectId={projectId} segmentCount={segments.length} onBack={() => setStep(3)} />}
       </main>
       <WizardFooter />
     </div>
