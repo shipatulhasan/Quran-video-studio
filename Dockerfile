@@ -42,6 +42,8 @@ ENV NODE_ENV=production
 ENV PORT=10000
 
 # Copy only what's needed to run
+# mkdir -p guards against an empty/absent public/ (uploads/ is gitignored)
+RUN mkdir -p ./public/uploads
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
