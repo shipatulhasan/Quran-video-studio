@@ -17,6 +17,8 @@ function resolveFfprobePath() {
   const binaryName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
   const candidates = [
     process.env.FFPROBE_PATH,
+    "/usr/bin/ffprobe",
+    "/usr/local/bin/ffprobe",
     path.join(process.cwd(), "node_modules", "ffprobe-static", "bin", process.platform, process.arch, binaryName),
   ].filter((value): value is string => Boolean(value));
   const resolved = candidates.find((candidate) => existsSync(candidate));

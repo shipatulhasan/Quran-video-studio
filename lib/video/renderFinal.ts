@@ -15,6 +15,8 @@ function resolveFfmpegPath() {
   const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
   const candidates = [
     process.env.FFMPEG_PATH,
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
     path.join(process.cwd(), "node_modules", "ffmpeg-static", binaryName),
   ].filter((value): value is string => Boolean(value));
   const resolved = candidates.find((candidate) => existsSync(candidate));

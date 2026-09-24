@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/bin/ffprobe
 ENV NODE_ENV=production
 ENV PORT=10000
 ENV HOSTNAME=0.0.0.0
