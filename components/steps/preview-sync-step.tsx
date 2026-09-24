@@ -242,7 +242,7 @@ export default function PreviewSyncStep({
             time={time}
             total={total}
             videoSrc={
-              projectId ? `/uploads/${projectId}/source.mp4` : undefined
+              projectId ? `/api/projects/${projectId}/video` : undefined
             }
             videoRef={videoRef}
             onToggle={togglePlayback}

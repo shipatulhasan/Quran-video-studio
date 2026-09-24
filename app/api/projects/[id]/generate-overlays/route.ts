@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { renderOverlay } from "@/lib/overlay/renderOverlay";
+import { isObjectStorageConfigured, objectKey, uploadFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     for (const segment of project.segments) {
       const filename = `${String(segment.segmentIndex + 1).padStart(4, "0")}.png`;
       await renderOverlay(segment, path.join(overlayDirectory, filename));
-      const assetPath = `/uploads/${id}/overlays/${filename}`;
+      const assetPath = isObjectStorageConfigured()
+        ? await uploadFile(path.join(overlayDirectory, filename), objectKey(id, `overlays/${filename}`), "image/png")
+        : `/uploads/${id}/overlays/${filename}`;
       generatedSegments.push(await db.segment.update({ where: { id: segment.id }, data: { overlayAssetPath: assetPath } }));
     }
     await db.project.update({ where: { id }, data: { status: "OVERLAYS_READY" } });

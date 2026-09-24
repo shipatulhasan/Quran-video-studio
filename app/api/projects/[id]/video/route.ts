@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir, unlink } from "node:fs/promises";
+import { mkdir, mkdtemp, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import ffmpeg from "fluent-ffmpeg";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { isObjectStorageConfigured, objectKey, uploadFile, publicUrl } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,15 @@ function frameRate(value?: string) {
   return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
 
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const project = await db.project.findUnique({ where: { id }, select: { baseVideoPath: true } });
+  if (!project?.baseVideoPath) return NextResponse.json({ error: "Video not found" }, { status: 404 });
+  const url = await publicUrl(project.baseVideoPath);
+  if (!url) return NextResponse.json({ error: "Video not found" }, { status: 404 });
+  return NextResponse.redirect(new URL(url, request.url));
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = await db.project.findUnique({ where: { id }, select: { id: true } });
@@ -49,8 +59,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (file.type !== "video/mp4" && !file.name.toLowerCase().endsWith(".mp4")) return NextResponse.json({ error: "Only MP4 video files are supported" }, { status: 415 });
 
   const storageRoot = process.env.STORAGE_DIR ? path.resolve(process.env.STORAGE_DIR) : path.join(process.cwd(), "public", "uploads");
+  const temporaryDirectory = isObjectStorageConfigured() ? await mkdtemp(path.join("/tmp", "fytobyte-video-")) : null;
   const projectDirectory = path.join(storageRoot, id);
-  const videoPath = path.join(projectDirectory, "source.mp4");
+  const videoPath = temporaryDirectory ? path.join(temporaryDirectory, "source.mp4") : path.join(projectDirectory, "source.mp4");
   try {
     await mkdir(projectDirectory, { recursive: true });
     await pipeline(Readable.fromWeb(file.stream() as never), createWriteStream(videoPath));
@@ -60,7 +71,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!videoStream?.width || !videoStream.height || !Number.isFinite(duration) || duration <= 0) throw new Error("Unable to read video metadata");
     const resolution = `${videoStream.width} × ${videoStream.height}`;
     const rate = frameRate(videoStream.r_frame_rate);
-    const updatedProject = await db.project.update({ where: { id }, data: { baseVideoPath: `/uploads/${id}/source.mp4`, duration, resolution, frameRate: rate, status: "VIDEO_READY" } });
+    const videoRef = isObjectStorageConfigured()
+      ? await uploadFile(videoPath, objectKey(id, "source.mp4"), "video/mp4")
+      : `/uploads/${id}/source.mp4`;
+    const updatedProject = await db.project.update({ where: { id }, data: { baseVideoPath: videoRef, duration, resolution, frameRate: rate, status: "VIDEO_READY" } });
     return NextResponse.json({ project: updatedProject, metadata: { duration, resolution, frameRate: rate } }, { status: 201 });
   } catch (error) {
     await unlink(videoPath).catch(() => undefined);
