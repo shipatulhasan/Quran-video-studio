@@ -3,7 +3,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "FYTOBYTE",
+  title: "Quran Studio",
   description: "Automated Quran video production",
 };
 export default function RootLayout({
