@@ -49,9 +49,11 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Copy the Prisma CLI so we use the pinned v6 binary — not whatever npx downloads
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 10000
 
-# Run migrations then start the app
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+# Use the local Prisma CLI (v6) to run migrations, then start Next.js
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]

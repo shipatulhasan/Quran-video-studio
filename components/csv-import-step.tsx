@@ -184,7 +184,7 @@ export default function CsvImportStep({ onNext, onComplete, onProjectId }: CsvIm
   return (
     <div className="animate-[fadeIn_0.2s_ease] space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <Step1Header title="CSV Validated" subtitle={`${rows.length} segments · ${file?.name ?? "Al-Fatihah.csv"} · ${file ? formatFileSize(file.size) : "2.1 KB"}`} />
+        <Step1Header title="CSV Validated" subtitle={`${rows.length} segments · ${file?.name ?? "segments.csv"} · ${file ? formatFileSize(file.size) : "—"}`} />
         <button type="button" onClick={() => { setPhase("idle"); setErrors([]); if (inputRef.current) inputRef.current.value = ""; }} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">Replace file</button>
       </div>
       <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/40">
