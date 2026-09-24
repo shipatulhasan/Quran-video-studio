@@ -1,13 +1,11 @@
 # SyncCaster
 
-[![Live App](https://img.shields.io/badge/Live%20App-Render-46E3B7?style=for-the-badge)](https://quran-video-studio.onrender.com/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/deploy.yml)
 [![Next.js](https://img.shields.io/badge/Next.js%2015-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-00E699?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
+[![Docker on EC2](https://img.shields.io/badge/Docker%20on%20EC2-AWS-FF9900?style=for-the-badge&logo=docker&logoColor=white)](docker-compose.yml)
 
 SyncCaster is a browser-based video production tool that composites timed overlay cards onto a background video and exports a broadcast-ready MP4. Upload a timing CSV, attach a background video, preview and adjust segment sync points, then render — all in one guided workflow.
-
-**Live application:** [https://quran-video-studio.onrender.com/](https://quran-video-studio.onrender.com/)
 
 ## Preview
 
@@ -37,7 +35,7 @@ SyncCaster is a browser-based video production tool that composites timed overla
 - **Real-time render progress** — live polling of FFmpeg encoding progress with stage labels and ETA
 - **Object storage support** — S3-compatible storage (Neon, Cloudflare R2, AWS S3) for videos and rendered output
 - **Dark / light mode** — persisted in `localStorage`, defaults to system preference
-- **Docker-ready** — Dockerfile with system FFmpeg for reliable deployment on Render
+- **Containerized Docker on AWS EC2 Setup** — Multi-stage Dockerfile, Docker Compose, Nginx reverse proxy, system FFmpeg/FFprobe, and automated GitHub Actions deployment
 
 ## Tech Stack
 
@@ -48,11 +46,12 @@ SyncCaster is a browser-based video production tool that composites timed overla
 | UI             | Tailwind CSS v4, shadcn-style components, Lucide React   |
 | State          | React `useState` / `useEffect`, `next-themes`            |
 | ORM            | Prisma 6 with PostgreSQL (Neon)                          |
-| Video          | FFmpeg (system binary via Docker), `fluent-ffmpeg`       |
+| Video          | System FFmpeg & FFprobe (in Docker), `fluent-ffmpeg`     |
 | Image          | Sharp (SVG → PNG overlay rendering)                      |
-| Storage        | S3-compatible object storage (optional)                  |
-| CI/CD          | GitHub Actions, Render deploy hooks                      |
-| Deployment     | Render (Docker runtime)                                  |
+| Storage        | Local disk or S3-compatible object storage               |
+| Container      | Docker, Docker Compose                                   |
+| CI/CD          | GitHub Actions, `rsync` over SSH                         |
+| Deployment     | AWS EC2 (Ubuntu 22.04/24.04), Docker Compose, Nginx      |
 
 ## Project Structure
 
@@ -91,7 +90,11 @@ synccaster/
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
+├── scripts/
+│   ├── ec2-bootstrap.sh                        # EC2 Docker installation & Nginx setup script
+│   └── ec2-deploy.sh                           # EC2 Docker Compose deployment script
 ├── Dockerfile
+├── docker-compose.yml
 ├── .dockerignore
 └── .github/workflows/deploy.yml
 ```
@@ -100,10 +103,10 @@ synccaster/
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - npm
 - PostgreSQL connection string (e.g. [Neon](https://neon.tech) free tier)
-- FFmpeg installed locally (`brew install ffmpeg` / `apt install ffmpeg`) **or** Docker
+- Docker Desktop (for local container builds) **or** local Node.js + FFmpeg
 
 ### Installation
 
@@ -121,11 +124,12 @@ cp .env.example .env
 ```
 
 ```env
-# Required
+# Required Database Connection
 DATABASE_URL="postgresql://user:pass@host/db?schema=public"
 
-# FFmpeg — leave empty to use ffmpeg-static (local dev), or set to /usr/bin/ffmpeg in Docker
-FFMPEG_PATH=""
+# FFmpeg & FFprobe paths (set automatically inside Docker container)
+FFMPEG_PATH="/usr/bin/ffmpeg"
+FFPROBE_PATH="/usr/bin/ffprobe"
 
 # S3-compatible object storage (optional — files stored in public/uploads/ when unset)
 S3_ENDPOINT=""
@@ -136,26 +140,79 @@ S3_SECRET_ACCESS_KEY=""
 S3_FORCE_PATH_STYLE="true"
 ```
 
-### Database Setup
+---
+
+## AWS EC2 Docker Deployment Setup
+
+### 1. Server Provisioning (One-Time Bootstrap)
+
+SSH into your fresh Ubuntu 22.04 / 24.04 LTS instance and run the bootstrap script:
 
 ```bash
-npx prisma migrate deploy
+# Clone repository or copy project files to your EC2 instance
+git clone https://github.com/<your-username>/<your-repo>.git /var/www/synccaster
+cd /var/www/synccaster
+
+# Make script executable and run bootstrap
+chmod +x scripts/ec2-bootstrap.sh
+sudo ./scripts/ec2-bootstrap.sh ubuntu
 ```
 
-### Running Locally
+This automated script will:
+- Install **Docker Engine** and **Docker Compose**
+- Add the `ubuntu` user to the `docker` group
+- Install and configure **Nginx reverse proxy** on Port 80 pointing to `http://127.0.0.1:10000` with `client_max_body_size 2048M` (2GB max upload)
+- Prepare persistent volume directories (`public/uploads` and `storage`)
+- Configure UFW firewall rules
+
+### 2. Configure Environment File on Server
+
+Create `/var/www/synccaster/.env` on the EC2 server:
 
 ```bash
-npm run dev
+nano /var/www/synccaster/.env
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Add your production environment variables (e.g. `DATABASE_URL`, `S3_*`).
 
-### Building for Production
+### 3. Deploy Application Manually
+
+You can trigger a deployment directly on the server at any time:
 
 ```bash
-npm run build
-npm run start
+chmod +x scripts/ec2-deploy.sh
+./scripts/ec2-deploy.sh /var/www/synccaster
 ```
+
+---
+
+## CI/CD Pipeline (GitHub Actions)
+
+This project uses [GitHub Actions](.github/workflows/deploy.yml) for automated container deployments.
+
+### Workflow Pipeline Steps:
+
+1. **Build & Type-Check (`ci`)**: Runs on every push to `main` or manual trigger.
+   - Installs dependencies (`npm ci`)
+   - Generates Prisma Client (`npx prisma generate`)
+   - Type-checks TypeScript (`npm run lint`)
+   - Builds Next.js (`npm run build`)
+2. **Deploy Docker Container to EC2 (`deploy-ec2`)**: Runs after `ci` passes.
+   - Connects to the EC2 server using SSH Key authentication
+   - Syncs project files securely via `rsync`
+   - Executes `scripts/ec2-deploy.sh` remotely to build and restart Docker containers with persistent volume mounts (`docker compose up --build -d`)
+
+### Required GitHub Secrets
+
+Add the following secrets under **GitHub Repository Settings → Secrets and variables → Actions**:
+
+| Secret Name | Description | Example / Value |
+| ----------- | ----------- | --------------- |
+| `EC2_HOST` | Public IP or DNS of EC2 instance | `54.210.12.34` |
+| `EC2_USERNAME` | SSH User for EC2 instance | `ubuntu` |
+| `EC2_SSH_KEY` | Private SSH key for EC2 authentication (PEM format) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+
+---
 
 ## CSV Format
 
@@ -176,61 +233,11 @@ ayah,arabic,translation,startTime,endTime
 2:255,اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ,Allah — there is no deity except Him,2.5,7.0
 ```
 
-## API Overview
-
-All routes are Next.js Route Handlers under `/api/projects`.
-
-| Method | Route                                     | Purpose                          |
-| ------ | ----------------------------------------- | -------------------------------- |
-| POST   | `/api/projects`                           | Create a new project             |
-| POST   | `/api/projects/:id/csv`                   | Upload and validate a timing CSV |
-| POST   | `/api/projects/:id/video`                 | Upload the background video      |
-| GET    | `/api/projects/:id/segments`              | List all segments                |
-| PATCH  | `/api/projects/:id/segments/:segmentId`   | Update a segment's timing        |
-| POST   | `/api/projects/:id/generate-overlays`     | Generate overlay PNG assets      |
-| POST   | `/api/projects/:id/render`                | Start an FFmpeg render job       |
-| GET    | `/api/projects/:id/render-status`         | Poll render job progress         |
-
-## CI/CD and Deployment
-
-This project uses [GitHub Actions](.github/workflows/deploy.yml) for CI/CD.
-
-On every push to `main`, the workflow:
-
-1. Checks out the repository
-2. Sets up Node.js 20
-3. Installs dependencies with `npm ci`
-4. Generates the Prisma client
-5. Runs the TypeScript type check (`npm run lint`)
-6. Triggers the Render deploy hook to redeploy the service
-
-Deployment is also available manually through `workflow_dispatch`.
-
-### Render Deployment (Docker)
-
-The `Dockerfile` in the repository root installs system FFmpeg and builds a production Next.js standalone image. Render auto-detects it when Docker is selected as the runtime.
-
-**Required Render environment variables:**
-
-```
-DATABASE_URL
-FFMPEG_PATH=/usr/bin/ffmpeg
-S3_ENDPOINT
-S3_BUCKET
-S3_ACCESS_KEY_ID
-S3_SECRET_ACCESS_KEY
-```
-
-**Required GitHub secret:**
-
-| Secret               | Value                                    |
-| -------------------- | ---------------------------------------- |
-| `RENDER_DEPLOY_HOOK` | Deploy hook URL from your Render service |
-| `DATABASE_URL`       | PostgreSQL connection string             |
+---
 
 ## Data Model
 
-```
+```text
 Project
   ├── id, name, status (DRAFT → CSV_READY → OVERLAYS_READY → RENDERING → COMPLETE)
   ├── baseVideoPath, duration, resolution, frameRate
@@ -240,10 +247,13 @@ Project
         └── status (PENDING → PROCESSING → DONE | FAILED), progress, stage, outputPath, error
 ```
 
+---
+
 ## Useful Links
 
-- [Live App](https://quran-video-studio.onrender.com/)
 - [CI/CD workflow](.github/workflows/deploy.yml)
+- [Docker Compose configuration](docker-compose.yml)
 - [Dockerfile](Dockerfile)
+- [EC2 Bootstrap Script](scripts/ec2-bootstrap.sh)
+- [EC2 Deploy Script](scripts/ec2-deploy.sh)
 - [Prisma schema](prisma/schema.prisma)
-- [Environment example](.env.example)

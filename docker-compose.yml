@@ -1,0 +1,24 @@
+name: synccaster
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synccaster-app
+    restart: always
+    ports:
+      - "10000:10000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=10000
+      - HOSTNAME=0.0.0.0
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - FFPROBE_PATH=/usr/bin/ffprobe
+    volumes:
+      # Persistent host volume mounts for uploaded videos and overlays
+      - ./public/uploads:/app/public/uploads
+      - ./storage:/app/storage
+      - /tmp:/tmp
