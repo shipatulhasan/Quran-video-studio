@@ -92,7 +92,7 @@ export function PreviewPlayer({
             </div>
           </div>
         </div>
-      ) }
+      )}
 
       <div className="pointer-events-none absolute inset-0 z-30 flex items-end justify-center pb-16">
         <button
