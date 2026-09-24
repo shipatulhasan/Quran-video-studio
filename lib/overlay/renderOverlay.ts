@@ -35,6 +35,11 @@ function textLines(lines: string[], x: number, firstBaseline: number, lineHeight
   return lines.map((line, index) => `<text x="${x}" y="${firstBaseline + index * lineHeight}" ${attributes}>${escapeXml(line)}</text>`).join("");
 }
 
+export function overlayDimensions(resolution: string | null | undefined) {
+  const match = resolution?.match(/(\d+)\s*[×x]\s*(\d+)/i);
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+}
+
 export async function renderOverlay(
   segment: Pick<Segment, "arabic" | "translation" | "ayah">,
   outputPath: string,
@@ -47,7 +52,7 @@ export async function renderOverlay(
   const cardX = (width - cardWidth) / 2;
   // Font and card scale together. Keeping these limits stable preserves the
   // same line width at every output resolution.
-  const arabicLines = wrapText(segment.arabic, 28);
+  const arabicLines = wrapText(segment.arabic, 56);
   const translationLines = wrapText(segment.translation, 64);
   const cardHeight = 150 * scale + arabicLines.length * 76 * scale + translationLines.length * 38 * scale;
   const cardY = height - cardHeight - 86 * scale;
@@ -57,7 +62,6 @@ export async function renderOverlay(
     <g clip-path="url(#cardClip)">
       ${textLines(arabicLines, width / 2, cardY + 92 * scale, 76 * scale, `fill="#ffffff" font-family="Arial, Noto Naskh Arabic, sans-serif" font-size="${58 * scale}" text-anchor="middle" direction="rtl"`)}
       ${textLines(translationLines, width / 2, cardY + (112 + arabicLines.length * 76) * scale, 38 * scale, `fill="#ffffff" fill-opacity="0.82" font-family="Arial, sans-serif" font-size="${28 * scale}" text-anchor="middle"`)}
-      <text x="${cardX + 48 * scale}" y="${cardY + cardHeight - 34 * scale}" fill="#ffffff" fill-opacity="0.45" font-family="monospace" font-size="${22 * scale}">${escapeXml(segment.ayah)}</text>
     </g>
   </svg>`;
 
