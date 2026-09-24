@@ -1,5 +1,5 @@
-import QuranVideoWizard from "@/components/quran-video-wizard";
+import SyncCaster from "@/components/sync-caster";
 
 export default function Home() {
-  return <QuranVideoWizard />;
+  return <SyncCaster />;
 }

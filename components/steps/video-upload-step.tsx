@@ -12,7 +12,7 @@ type Phase = "idle" | "dragover" | "loading" | "loaded";
 export default function VideoUploadStep({ onNext, onBack, projectId }: { onNext: () => void; onBack: () => void; projectId: string | null }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [filename, setFilename] = useState("quran-recitation-mishary.mp4");
+  const [filename, setFilename] = useState("background-video.mp4");
   const [metadata, setMetadata] = useState<VideoMetadataValues | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const handleFile = useCallback(async (file: File) => {

@@ -76,7 +76,7 @@ export default function CsvImportStep({ onNext, onComplete, onProjectId }: CsvIm
         const projectResponse = await fetch("/api/projects", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: "Quran Video Project" }),
+          body: JSON.stringify({ name: "SyncCaster Project" }),
         });
         const project = (await projectResponse.json()) as { projectId?: string; error?: string };
         if (!projectResponse.ok || !project.projectId) throw new Error(project.error ?? "Could not create project");
