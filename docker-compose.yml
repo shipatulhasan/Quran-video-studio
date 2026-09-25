@@ -2,9 +2,7 @@ name: synccaster
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-synccaster:latest}
     container_name: synccaster-app
     restart: always
     ports:

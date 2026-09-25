@@ -3,7 +3,6 @@
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/deploy.yml)
 [![Next.js](https://img.shields.io/badge/Next.js%2015-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-00E699?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
-[![Deployment](https://img.shields.io/badge/Deployment-AWS%20EC2-FF9900?style=for-the-badge&logo=amazonec2&logoColor=white)](scripts)
 [![Docker on EC2](https://img.shields.io/badge/Docker%20on%20EC2-AWS-FF9900?style=for-the-badge&logo=docker&logoColor=white)](docker-compose.yml)
 
 SyncCaster is a browser-based video production tool that composites timed overlay cards onto a background video and exports a broadcast-ready MP4. Upload a timing CSV, attach a background video, preview and adjust segment sync points, then render — all in one guided workflow.
@@ -36,8 +35,7 @@ SyncCaster is a browser-based video production tool that composites timed overla
 - **Real-time render progress** — live polling of FFmpeg encoding progress with stage labels and ETA
 - **Object storage support** — S3-compatible storage (Neon, Cloudflare R2, AWS S3) for videos and rendered output
 - **Dark / light mode** — persisted in `localStorage`, defaults to system preference
-- **AWS EC2 Production Setup** — Node.js 22 LTS, PM2 process management, Nginx reverse proxy, system FFmpeg, and automated deployment scripts
-- **Containerized Docker on AWS EC2 Setup** — Multi-stage Dockerfile, Docker Compose, Nginx reverse proxy, system FFmpeg/FFprobe, and automated GitHub Actions deployment
+- **Zero-Source Containerized Deployments** — Pre-built Docker images pushed to GitHub Container Registry (GHCR) and pulled directly on EC2. Zero source code is stored on the EC2 server.
 
 ## Tech Stack
 
@@ -48,13 +46,11 @@ SyncCaster is a browser-based video production tool that composites timed overla
 | UI             | Tailwind CSS v4, shadcn-style components, Lucide React   |
 | State          | React `useState` / `useEffect`, `next-themes`            |
 | ORM            | Prisma 6 with PostgreSQL (Neon)                          |
-| Video          | System FFmpeg & FFprobe, `fluent-ffmpeg`                 |
 | Video          | System FFmpeg & FFprobe (in Docker), `fluent-ffmpeg`     |
 | Image          | Sharp (SVG → PNG overlay rendering)                      |
-| Storage        | Local disk or S3-compatible object storage               |
-| Container      | Docker, Docker Compose                                   |
-| CI/CD          | GitHub Actions, `rsync` over SSH                         |
-| Deployment     | AWS EC2 (Ubuntu 22.04/24.04), PM2, Nginx                  |
+| Storage        | Local disk or S3-compatible object storage (Neon S3)     |
+| Container      | Docker, Docker Compose, GitHub Container Registry (GHCR) |
+| CI/CD          | GitHub Actions, SSH, `rsync`                             |
 | Deployment     | AWS EC2 (Ubuntu 22.04/24.04), Docker Compose, Nginx      |
 
 ## Project Structure
@@ -95,10 +91,8 @@ synccaster/
 │   ├── schema.prisma
 │   └── migrations/
 ├── scripts/
-│   ├── ec2-bootstrap.sh                        # EC2 initial server setup script
-│   └── ec2-deploy.sh                           # EC2 deployment & PM2 restart script
 │   ├── ec2-bootstrap.sh                        # EC2 Docker installation & Nginx setup script
-│   └── ec2-deploy.sh                           # EC2 Docker Compose deployment script
+│   └── ec2-deploy.sh                           # EC2 Docker Compose pull & deploy script
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
@@ -112,7 +106,6 @@ synccaster/
 - Node.js 22+
 - npm
 - PostgreSQL connection string (e.g. [Neon](https://neon.tech) free tier)
-- System FFmpeg & FFprobe installed (`sudo apt install ffmpeg` / `brew install ffmpeg`)
 - Docker Desktop (for local container builds) **or** local Node.js + FFmpeg
 
 ### Installation
@@ -134,105 +127,56 @@ cp .env.example .env
 # Required Database Connection
 DATABASE_URL="postgresql://user:pass@host/db?schema=public"
 
-# FFmpeg & FFprobe paths (set automatically in production)
 # FFmpeg & FFprobe paths (set automatically inside Docker container)
 FFMPEG_PATH="/usr/bin/ffmpeg"
 FFPROBE_PATH="/usr/bin/ffprobe"
 
-# S3-compatible object storage (optional — files stored in public/uploads/ when unset)
-S3_ENDPOINT=""
+# S3-compatible object storage (Neon S3 / AWS S3)
+S3_ENDPOINT="https://ep-xxxx.c-4.ap-southeast-1.aws.neon.tech"
 S3_REGION="auto"
-S3_BUCKET=""
-S3_ACCESS_KEY_ID=""
-S3_SECRET_ACCESS_KEY=""
+S3_BUCKET="synccaster-storage"
+S3_ACCESS_KEY_ID="your_neon_s3_key"
+S3_SECRET_ACCESS_KEY="your_neon_s3_secret"
 S3_FORCE_PATH_STYLE="true"
 ```
 
-### Database Setup
-
-```bash
-npx prisma migrate deploy
-```
-
-### Running Locally
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
 ---
 
-## AWS EC2 Deployment Setup
-## AWS EC2 Docker Deployment Setup
+## AWS EC2 Deployment Setup (Option A - Zero Source Code on EC2)
 
 ### 1. Server Provisioning (One-Time Bootstrap)
 
 SSH into your fresh Ubuntu 22.04 / 24.04 LTS instance and run the bootstrap script:
 
 ```bash
-# Clone repository or copy scripts directory to your EC2 instance
-# Clone repository or copy project files to your EC2 instance
-git clone https://github.com/<your-username>/<your-repo>.git /var/www/synccaster
-cd /var/www/synccaster
-
-# Make script executable and run bootstrap
-chmod +x scripts/ec2-bootstrap.sh
-sudo ./scripts/ec2-bootstrap.sh ubuntu
+# Copy scripts/ec2-bootstrap.sh to your EC2 instance and run
+chmod +x ec2-bootstrap.sh
+sudo ./ec2-bootstrap.sh ubuntu /var/www/synccaster
 ```
 
 This automated script will:
-- Install Node.js 22 LTS, npm, PM2, Git, OpenSSL, Nginx, and FFmpeg/FFprobe
-- Configure Nginx reverse proxy on Port 80 with a 2GB file upload limit (`client_max_body_size 2048M`)
-- Create application and uploads storage directories with correct permissions
-- Set up UFW firewall rules and PM2 auto-boot service
 - Install **Docker Engine** and **Docker Compose**
 - Add the `ubuntu` user to the `docker` group
 - Install and configure **Nginx reverse proxy** on Port 80 pointing to `http://127.0.0.1:10000` with `client_max_body_size 2048M` (2GB max upload)
 - Prepare persistent volume directories (`public/uploads` and `storage`)
 - Configure UFW firewall rules
 
-### 2. Configure Environment File on Server
-
-Create `/var/www/synccaster/.env` on the EC2 server:
-
-```bash
-nano /var/www/synccaster/.env
-```
-
-Add your production environment variables (e.g., `DATABASE_URL`, `FFMPEG_PATH=/usr/bin/ffmpeg`, `FFPROBE_PATH=/usr/bin/ffprobe`).
-Add your production environment variables (e.g. `DATABASE_URL`, `S3_*`).
-
-### 3. Deploy Application Manually
-
-You can trigger a deployment directly on the server at any time:
-
-```bash
-chmod +x scripts/ec2-deploy.sh
-./scripts/ec2-deploy.sh /var/www/synccaster
-```
-
 ---
 
-## CI/CD Pipeline (GitHub Actions)
+## CI/CD Pipeline (GitHub Actions + GitHub Container Registry)
 
-This project uses [GitHub Actions](.github/workflows/deploy.yml) for automated deployments.
-This project uses [GitHub Actions](.github/workflows/deploy.yml) for automated container deployments.
+This project uses [GitHub Actions](.github/workflows/deploy.yml) for automated container builds and deployments.
 
 ### Workflow Pipeline Steps:
 
-1. **Build & Type-Check (`ci`)**: Runs on every push to `main` or manual trigger.
-   - Installs dependencies (`npm ci`)
-   - Generates Prisma Client (`npx prisma generate`)
-   - Type-checks TypeScript (`npm run lint`)
-   - Builds Next.js (`npm run build`)
-2. **Deploy to EC2 (`deploy-ec2`)**: Runs after `ci` passes.
-2. **Deploy Docker Container to EC2 (`deploy-ec2`)**: Runs after `ci` passes.
-   - Connects to the EC2 server using SSH Key authentication
-   - Syncs project files securely via `rsync`
-   - Executes `scripts/ec2-deploy.sh` remotely on the EC2 instance to run migrations, build, and zero-downtime reload via PM2
-   - Executes `scripts/ec2-deploy.sh` remotely to build and restart Docker containers with persistent volume mounts (`docker compose up --build -d`)
+1. **Build & Push Docker Image (`build-and-push`)**:
+   - Builds the production Docker container in CI
+   - Pushes the image to **GitHub Container Registry** (`ghcr.io/your-user/synccaster:latest`)
+2. **Deploy Container to EC2 (`deploy`)**:
+   - Connects to EC2 via SSH using `EC2_SSH`
+   - Syncs **ONLY** `docker-compose.yml` and deployment scripts to EC2 (**No source code is pushed to EC2!**)
+   - **Creates `.env` on EC2 from your single `APP_ENV` GitHub secret**
+   - Triggers `scripts/ec2-deploy.sh` remotely to pull the pre-built image and run `docker compose up -d`
 
 ### Required GitHub Secrets
 
@@ -241,8 +185,10 @@ Add the following secrets under **GitHub Repository Settings → Secrets and var
 | Secret Name | Description | Example / Value |
 | ----------- | ----------- | --------------- |
 | `EC2_HOST` | Public IP or DNS of EC2 instance | `54.210.12.34` |
-| `EC2_USERNAME` | SSH User for EC2 instance | `ubuntu` |
-| `EC2_SSH_KEY` | Private SSH key for EC2 authentication (PEM format) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `EC2_USER` | SSH User for EC2 instance | `ubuntu` |
+| `EC2_SSH` | Private SSH key for EC2 authentication (PEM format) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `APP_DIR` | Application target path on EC2 | `/var/www/synccaster` |
+| `APP_ENV` | **Entire `.env` file contents** (DATABASE_URL, S3_*, etc.) | *(Paste your full `.env` file text here)* |
 
 ---
 
@@ -289,5 +235,4 @@ Project
 - [EC2 Bootstrap Script](scripts/ec2-bootstrap.sh)
 - [EC2 Deploy Script](scripts/ec2-deploy.sh)
 - [Prisma schema](prisma/schema.prisma)
-- [Environment example](.env.example)
 

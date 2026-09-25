@@ -1,71 +1,146 @@
-name: CI/CD Pipeline (Docker on EC2)
+name: Deploy SyncCaster Application
 
 on:
   push:
-    branches:
-      - main
+    branches: ['main']
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  ci:
-    name: Build & Type-Check
+  build-and-push:
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
         with:
-          node-version: 22
-          cache: npm
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Type-Check (TypeScript)
-        run: npm run lint
-
-      - name: Build Next.js Application
-        run: npm run build
-
-  deploy-ec2:
-    name: Deploy Docker Container to EC2
+  deploy:
+    name: Deploy on machine
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: build-and-push
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH Key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
-      - name: Add EC2 Host Key to Known Hosts
+      - name: Prepare SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH: ${{ secrets.EC2_SSH }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -H -t rsa,ed25519 ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          echo "$EC2_SSH" > ~/.ssh/synccaster.pem
+          chmod 400 ~/.ssh/synccaster.pem
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
-      - name: Sync Code to EC2 Server
+      - name: Push compose & scripts to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
         run: |
-          rsync -avz --delete \
-            --exclude='node_modules' \
-            --exclude='.next' \
-            --exclude='.git' \
-            --exclude='.env' \
-            --exclude='.env.*' \
-            --exclude='public/uploads' \
-            --exclude='storage' \
-            ./ ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/var/www/synccaster/
+          set -euo pipefail
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          rsync -az --delete \
+            --include="docker-compose.yml" \
+            --include="scripts/***" \
+            --exclude="*" \
+            -e "ssh -i ~/.ssh/synccaster.pem" \
+            ./ "$EC2_USER@$EC2_HOST:$APP_DIR/"
 
-      - name: Execute Remote Docker Deployment Script
+      - name: Bootstrap EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
         run: |
-          ssh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} "bash /var/www/synccaster/scripts/ec2-deploy.sh /var/www/synccaster"
+          set -euo pipefail
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" \
+            "sudo bash -s -- '$EC2_USER' '$APP_DIR'" < scripts/ec2-bootstrap.sh
 
+      - name: Creating env file
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+          APP_ENV: ${{ secrets.APP_ENV }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          IMAGE_TAG="ghcr.io/${REPOSITORY,,}:latest"
+          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" << EOF
+          cat > "$APP_DIR/.env" << 'ENV_APP'
+          IMAGE_NAME=${IMAGE_TAG}
+          $APP_ENV
+          ENV_APP
+          EOF
+
+      - name: Verify EC2 setup
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+        run: |
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" << EOF
+          echo "Checking directory & files..."
+          test -d "$APP_DIR" || {
+            echo "❌ App directory missing: $APP_DIR"
+            exit 1
+          }
+          test -f "$APP_DIR/.env" || {
+            echo "❌ .env file missing"
+            exit 1
+          }
+          test -f "$APP_DIR/docker-compose.yml" || {
+            echo "❌ docker-compose.yml missing"
+            exit 1
+          }
+          echo "✅ EC2 verification successful"
+          EOF
+
+      - name: Deploy application
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+        run: |
+          set -euo pipefail
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" \
+            "bash -s -- '$APP_DIR'" < scripts/ec2-deploy.sh
