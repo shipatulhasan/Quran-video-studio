@@ -67,6 +67,17 @@ jobs:
           chmod 400 ~/.ssh/synccaster.pem
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
+      - name: Bootstrap EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+        run: |
+          set -euo pipefail
+          APP_DIR="${APP_DIR:-/var/www/synccaster}"
+          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" \
+            "sudo bash -s -- '$EC2_USER' '$APP_DIR'" < scripts/ec2-bootstrap.sh
+
       - name: Push compose & scripts to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -82,16 +93,7 @@ jobs:
             -e "ssh -i ~/.ssh/synccaster.pem" \
             ./ "$EC2_USER@$EC2_HOST:$APP_DIR/"
 
-      - name: Bootstrap EC2
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          APP_DIR: ${{ secrets.APP_DIR }}
-        run: |
-          set -euo pipefail
-          APP_DIR="${APP_DIR:-/var/www/synccaster}"
-          ssh -i ~/.ssh/synccaster.pem "$EC2_USER@$EC2_HOST" \
-            "sudo bash -s -- '$EC2_USER' '$APP_DIR'" < scripts/ec2-bootstrap.sh
+
 
       - name: Creating env file
         env:
