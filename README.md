@@ -9,23 +9,23 @@ SyncCaster is a browser-based video production tool that composites timed overla
 
 ## Preview
 
-> Add screenshots here.
-
 ### Step 1 — Upload CSV
 
-![CSV Upload](docs/step1-csv.png)
+![CSV Upload](docs/upload_csv.png)
+![CSV Parsing](docs/parsing_csv.png)
+![Generate Overlay Cards](docs/generate_overlays.png)
 
 ### Step 2 — Add Video
 
-![Video Upload](docs/step2-video.png)
+![Video Upload](docs/add_video.png)
 
 ### Step 3 — Preview & Sync
 
-![Preview Sync](docs/step3-sync.png)
+![Preview Sync](docs/preview_sync.png)
 
 ### Step 4 — Render & Export
 
-![Render](docs/step4-render.png)
+![Render](docs/render_export.png)
 
 ## Features
 
